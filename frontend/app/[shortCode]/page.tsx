@@ -15,11 +15,16 @@ export default function RedirectPage({
   useEffect(() => {
     const redirect = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/urls/${params.shortCode}`);
+        // Fetch from backend which will return the original URL or redirect
+        const response = await fetch(`${API_URL}/${params.shortCode}`, {
+          redirect: 'manual' // Don't follow redirects automatically
+        });
 
-        if (response.redirected) {
-          window.location.href = response.url;
+        if (response.status === 0 || response.type === 'opaqueredirect') {
+          // Redirect happened, follow it
+          window.location.href = `${API_URL}/${params.shortCode}`;
         } else if (response.ok) {
+          // Get the data and redirect
           const data = await response.json();
           if (data.originalUrl) {
             window.location.href = data.originalUrl;
@@ -30,7 +35,8 @@ export default function RedirectPage({
           setError(true);
         }
       } catch (err) {
-        setError(true);
+        // If there's an error, try direct redirect
+        window.location.href = `${API_URL}/${params.shortCode}`;
       }
     };
 

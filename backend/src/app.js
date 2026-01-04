@@ -3,6 +3,7 @@ const cors = require('cors');
 const healthRoutes = require('./routes/health.routes');
 const authRoutes = require('./routes/auth.routes');
 const urlRoutes = require('./routes/url.routes');
+const redirectRoutes = require('./routes/redirect.routes');
 
 const app = express();
 
@@ -15,6 +16,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/urls', urlRoutes);
+
+// Redirect route - must be last to catch short codes
+app.use('/', redirectRoutes);
 
 // 404 handler
 app.use((req, res) => {

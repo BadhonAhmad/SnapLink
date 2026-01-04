@@ -8,7 +8,4 @@ router.post('/', authMiddleware, urlController.createUrl);
 router.get('/', authMiddleware, urlController.getUserUrls);
 router.delete('/:id', authMiddleware, urlController.deleteUrl);
 
-// Public route - redirect short URL
-router.get('/:shortCode', urlController.redirectUrl);
-
 module.exports = router;
