@@ -13,34 +13,8 @@ export default function RedirectPage({
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
   useEffect(() => {
-    const redirect = async () => {
-      try {
-        // Fetch from backend which will return the original URL or redirect
-        const response = await fetch(`${API_URL}/${params.shortCode}`, {
-          redirect: 'manual' // Don't follow redirects automatically
-        });
-
-        if (response.status === 0 || response.type === 'opaqueredirect') {
-          // Redirect happened, follow it
-          window.location.href = `${API_URL}/${params.shortCode}`;
-        } else if (response.ok) {
-          // Get the data and redirect
-          const data = await response.json();
-          if (data.originalUrl) {
-            window.location.href = data.originalUrl;
-          } else {
-            setError(true);
-          }
-        } else {
-          setError(true);
-        }
-      } catch (err) {
-        // If there's an error, try direct redirect
-        window.location.href = `${API_URL}/${params.shortCode}`;
-      }
-    };
-
-    redirect();
+    // Simply redirect to backend, which will count the click and redirect to original URL
+    window.location.href = `${API_URL}/${params.shortCode}`;
   }, [params.shortCode, API_URL]);
 
   if (error) {

@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { authService } from "@/services/authService";
 import { urlService, Url } from "@/services/urlService";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, FormEvent } from "react";
+import { useState, useEffect, useCallback, FormEvent } from "react";
 
 export default function DashboardPage() {
   const { isLoading } = useAuth();
@@ -27,7 +27,7 @@ export default function DashboardPage() {
   };
 
   // Fetch user's URLs
-  const fetchUrls = async () => {
+  const fetchUrls = useCallback(async () => {
     const response = await urlService.getUserUrls();
     if (response.success && response.data) {
       setUrls(response.data.urls || []);
@@ -41,13 +41,21 @@ export default function DashboardPage() {
       );
       setTotalClicks(clicks);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (!isLoading) {
       fetchUrls();
+
+      // Set up polling to refresh data every 3 seconds for faster updates
+      const intervalId = setInterval(() => {
+        fetchUrls();
+      }, 3000);
+
+      // Clean up interval on component unmount
+      return () => clearInterval(intervalId);
     }
-  }, [isLoading]);
+  }, [isLoading, fetchUrls]);
 
   // Handle URL creation
   const handleCreateUrl = async (e: FormEvent) => {
