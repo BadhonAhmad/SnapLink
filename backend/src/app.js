@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const healthRoutes = require('./routes/health.routes');
 const authRoutes = require('./routes/auth.routes');
+const urlRoutes = require('./routes/url.routes');
 
 const app = express();
 
@@ -13,6 +14,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/health', healthRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/urls', urlRoutes);
 
 // 404 handler
 app.use((req, res) => {

@@ -2,16 +2,120 @@
 
 import { useAuth } from "@/hooks/useAuth";
 import { authService } from "@/services/authService";
+import { urlService, Url } from "@/services/urlService";
 import { useRouter } from "next/navigation";
+import { useState, useEffect, FormEvent } from "react";
 
 export default function DashboardPage() {
   const { isLoading } = useAuth();
   const router = useRouter();
   const user = authService.getUser();
 
+  const [longUrl, setLongUrl] = useState("");
+  const [urls, setUrls] = useState<Url[]>([]);
+  const [urlCount, setUrlCount] = useState(0);
+  const [urlLimit, setUrlLimit] = useState(100);
+  const [totalClicks, setTotalClicks] = useState(0);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+
   const handleLogout = () => {
     authService.logout();
     router.push("/login");
+  };
+
+  // Fetch user's URLs
+  const fetchUrls = async () => {
+    const response = await urlService.getUserUrls();
+    if (response.success && response.data) {
+      setUrls(response.data.urls || []);
+      setUrlCount(response.data.count || 0);
+      setUrlLimit(response.data.limit || 100);
+
+      // Calculate total clicks
+      const clicks = (response.data.urls || []).reduce(
+        (sum, url) => sum + url.clicks,
+        0
+      );
+      setTotalClicks(clicks);
+    }
+  };
+
+  useEffect(() => {
+    if (!isLoading) {
+      fetchUrls();
+    }
+  }, [isLoading]);
+
+  // Handle URL creation
+  const handleCreateUrl = async (e: FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+    setIsCreating(true);
+
+    try {
+      const response = await urlService.createUrl(longUrl);
+
+      if (response.success) {
+        setSuccess("Short URL created successfully!");
+        setLongUrl("");
+        fetchUrls();
+
+        // Clear success message after 3 seconds
+        setTimeout(() => setSuccess(""), 3000);
+      } else {
+        if (response.limitReached) {
+          setError(`⚠️ ${response.message}`);
+        } else {
+          setError(response.message || "Failed to create short URL");
+        }
+      }
+    } catch (err) {
+      setError("An error occurred. Please try again.");
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  // Handle URL deletion
+  const handleDelete = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this URL?")) {
+      return;
+    }
+
+    const response = await urlService.deleteUrl(id);
+    if (response.success) {
+      fetchUrls();
+    } else {
+      alert(response.message || "Failed to delete URL");
+    }
+  };
+
+  // Handle copy to clipboard
+  const handleCopy = async (shortUrl: string, id: number) => {
+    const success = await urlService.copyToClipboard(shortUrl);
+    if (success) {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    }
+  };
+
+  // Truncate URL for display
+  const truncateUrl = (url: string, maxLength: number = 50) => {
+    return url.length > maxLength ? url.substring(0, maxLength) + "..." : url;
+  };
+
+  // Format date
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
   };
 
   if (isLoading) {
@@ -45,21 +149,24 @@ export default function DashboardPage() {
             <h3 className="text-lg font-semibold text-gray-700 mb-2">
               Total Links
             </h3>
-            <p className="text-3xl font-bold text-blue-600">0</p>
+            <p className="text-3xl font-bold text-blue-600">{urlCount}</p>
+            <p className="text-sm text-gray-500 mt-1">
+              {urlCount}/{urlLimit} limit
+            </p>
           </div>
 
           <div className="bg-white p-6 rounded-lg shadow-md">
             <h3 className="text-lg font-semibold text-gray-700 mb-2">
               Total Clicks
             </h3>
-            <p className="text-3xl font-bold text-green-600">0</p>
+            <p className="text-3xl font-bold text-green-600">{totalClicks}</p>
           </div>
 
           <div className="bg-white p-6 rounded-lg shadow-md">
             <h3 className="text-lg font-semibold text-gray-700 mb-2">
               Active Links
             </h3>
-            <p className="text-3xl font-bold text-purple-600">0</p>
+            <p className="text-3xl font-bold text-purple-600">{urlCount}</p>
           </div>
         </div>
 
@@ -67,7 +174,20 @@ export default function DashboardPage() {
           <h2 className="text-2xl font-bold text-gray-800 mb-4">
             Create Short Link
           </h2>
-          <form className="space-y-4">
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+
+          {success && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
+              <p className="text-sm text-green-600">{success}</p>
+            </div>
+          )}
+
+          <form className="space-y-4" onSubmit={handleCreateUrl}>
             <div>
               <label
                 htmlFor="url"
@@ -78,24 +198,114 @@ export default function DashboardPage() {
               <input
                 type="url"
                 id="url"
+                value={longUrl}
+                onChange={(e) => setLongUrl(e.target.value)}
+                required
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                 placeholder="https://example.com/very/long/url"
               />
             </div>
             <button
               type="submit"
-              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              disabled={isCreating}
+              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Shorten URL
+              {isCreating ? "Creating..." : "Shorten URL"}
             </button>
           </form>
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6 mt-8">
           <h2 className="text-2xl font-bold text-gray-800 mb-4">Your Links</h2>
-          <p className="text-gray-600">
-            No links created yet. Create your first short link above!
-          </p>
+
+          {urls.length === 0 ? (
+            <p className="text-gray-600">
+              No links created yet. Create your first short link above!
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Original URL
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Short Code
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Short URL
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Clicks
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Created
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {urls.map((url) => (
+                    <tr key={url.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900 max-w-xs">
+                          <span title={url.originalUrl}>
+                            {truncateUrl(url.originalUrl)}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-mono text-gray-900">
+                          {url.shortCode}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-blue-600">
+                          <a
+                            href={url.shortUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:underline"
+                          >
+                            {truncateUrl(url.shortUrl, 40)}
+                          </a>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {url.clicks}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-500">
+                          {formatDate(url.createdAt)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                        <button
+                          onClick={() => handleCopy(url.shortUrl, url.id)}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="Copy to clipboard"
+                        >
+                          {copiedId === url.id ? "✓ Copied!" : "Copy"}
+                        </button>
+                        <button
+                          onClick={() => handleDelete(url.id)}
+                          className="text-red-600 hover:text-red-900"
+                          title="Delete URL"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </div>
