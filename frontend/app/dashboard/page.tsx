@@ -52,10 +52,10 @@ export default function DashboardPage() {
     if (!isLoading) {
       fetchUrls();
 
-      // Set up polling to refresh data every 3 seconds for faster updates
+      // Set up polling to refresh data every 5 seconds (increased to avoid interfering with copy feedback)
       const intervalId = setInterval(() => {
         fetchUrls();
-      }, 3000);
+      }, 5000);
 
       // Clean up interval on component unmount
       return () => clearInterval(intervalId);
@@ -266,21 +266,27 @@ export default function DashboardPage() {
                           {formatDate(url.createdAt)}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                        <button
-                          onClick={() => handleCopy(url.shortUrl, url.id)}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="Copy to clipboard"
-                        >
-                          {copiedId === url.id ? "✓ Copied!" : "Copy"}
-                        </button>
-                        <button
-                          onClick={() => handleDelete(url.id)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Delete URL"
-                        >
-                          Delete
-                        </button>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => handleCopy(url.shortUrl, url.id)}
+                            className={`inline-flex items-center justify-center w-20 text-sm font-medium transition-colors ${
+                              copiedId === url.id
+                                ? "text-green-600 hover:text-green-700"
+                                : "text-blue-600 hover:text-blue-700"
+                            }`}
+                            title="Copy to clipboard"
+                          >
+                            {copiedId === url.id ? "✓ Copied!" : "Copy"}
+                          </button>
+                          <button
+                            onClick={() => handleDelete(url.id)}
+                            className="inline-flex items-center justify-center w-16 text-sm font-medium text-red-600 hover:text-red-700 transition-colors"
+                            title="Delete URL"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

@@ -1,183 +1,122 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const db = require('../database/db');
+/**
+ * Auth Controller
+ * Handles HTTP requests for authentication
+ * Delegates business logic to auth service
+ */
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+const authService = require('../services/auth.service');
+const { sendSuccess, handleServiceError } = require('../utils/responseHelper');
+const { isValidEmail, validatePassword, sanitizeString } = require('../utils/validation');
 
 const authController = {
-  // Register new user
+  /**
+   * Register a new user
+   * POST /api/auth/register
+   * Body: { email, password, name? }
+   */
   register: async (req, res) => {
     try {
       const { email, password, name } = req.body;
 
-      // Validate input
+      // Validate required fields
       if (!email || !password) {
-        return res.status(400).json({
-          success: false,
-          message: 'Email and password are required'
-        });
+        return handleServiceError(
+          res, 
+          { message: 'Email and password are required', statusCode: 400 }
+        );
       }
 
-      // Check if user already exists
-      db.get('SELECT * FROM users WHERE email = ?', [email], async (err, user) => {
-        if (err) {
-          return res.status(500).json({
-            success: false,
-            message: 'Database error'
-          });
-        }
+      // Validate email format
+      if (!isValidEmail(email)) {
+        return handleServiceError(
+          res,
+          { message: 'Please provide a valid email address', statusCode: 400 }
+        );
+      }
 
-        if (user) {
-          return res.status(400).json({
-            success: false,
-            message: 'User already exists'
-          });
-        }
+      // Validate password strength
+      const passwordValidation = validatePassword(password);
+      if (!passwordValidation.isValid) {
+        return handleServiceError(
+          res,
+          { message: passwordValidation.message, statusCode: 400 }
+        );
+      }
 
-        // Hash password
-        const hashedPassword = await bcrypt.hash(password, 10);
+      // Sanitize inputs
+      const sanitizedEmail = sanitizeString(email).toLowerCase();
+      const sanitizedName = name ? sanitizeString(name) : null;
 
-        // Create user
-        const query = 'INSERT INTO users (email, password, name, created_at) VALUES (?, ?, ?, datetime("now"))';
-        
-        db.run(query, [email, hashedPassword, name || null], function(err) {
-          if (err) {
-            return res.status(500).json({
-              success: false,
-              message: 'Error creating user'
-            });
-          }
+      // Call service to register user
+      const userData = await authService.registerUser(
+        sanitizedEmail, 
+        password, 
+        sanitizedName
+      );
 
-          // Generate JWT token
-          const token = jwt.sign(
-            { userId: this.lastID, email },
-            JWT_SECRET,
-            { expiresIn: JWT_EXPIRES_IN }
-          );
-
-          res.status(201).json({
-            success: true,
-            message: 'User registered successfully',
-            data: {
-              token,
-              user: {
-                id: this.lastID,
-                email,
-                name: name || null
-              }
-            }
-          });
-        });
-      });
+      return sendSuccess(
+        res,
+        userData,
+        'User registered successfully',
+        201
+      );
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: 'Server error',
-        error: error.message
-      });
+      return handleServiceError(res, error);
     }
   },
 
-  // Login user
+  /**
+   * Login existing user
+   * POST /api/auth/login
+   * Body: { email, password }
+   */
   login: async (req, res) => {
     try {
       const { email, password } = req.body;
 
-      // Validate input
+      // Validate required fields
       if (!email || !password) {
-        return res.status(400).json({
-          success: false,
-          message: 'Email and password are required'
-        });
+        return handleServiceError(
+          res,
+          { message: 'Email and password are required', statusCode: 400 }
+        );
       }
 
-      // Find user
-      db.get('SELECT * FROM users WHERE email = ?', [email], async (err, user) => {
-        if (err) {
-          return res.status(500).json({
-            success: false,
-            message: 'Database error'
-          });
-        }
-
-        if (!user) {
-          return res.status(401).json({
-            success: false,
-            message: 'Invalid credentials'
-          });
-        }
-
-        // Verify password
-        const isValidPassword = await bcrypt.compare(password, user.password);
-
-        if (!isValidPassword) {
-          return res.status(401).json({
-            success: false,
-            message: 'Invalid credentials'
-          });
-        }
-
-        // Generate JWT token
-        const token = jwt.sign(
-          { userId: user.id, email: user.email },
-          JWT_SECRET,
-          { expiresIn: JWT_EXPIRES_IN }
+      // Validate email format
+      if (!isValidEmail(email)) {
+        return handleServiceError(
+          res,
+          { message: 'Please provide a valid email address', statusCode: 400 }
         );
+      }
 
-        res.json({
-          success: true,
-          message: 'Login successful',
-          data: {
-            token,
-            user: {
-              id: user.id,
-              email: user.email,
-              name: user.name
-            }
-          }
-        });
-      });
+      // Sanitize email
+      const sanitizedEmail = sanitizeString(email).toLowerCase();
+
+      // Call service to authenticate user
+      const userData = await authService.loginUser(sanitizedEmail, password);
+
+      return sendSuccess(res, userData, 'Login successful');
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: 'Server error',
-        error: error.message
-      });
+      return handleServiceError(res, error);
     }
   },
 
-  // Get current user
-  getCurrentUser: (req, res) => {
+  /**
+   * Get current authenticated user profile
+   * GET /api/auth/me
+   * Requires authentication
+   */
+  getCurrentUser: async (req, res) => {
     try {
       const userId = req.user.userId;
 
-      db.get('SELECT id, email, name, created_at FROM users WHERE id = ?', [userId], (err, user) => {
-        if (err) {
-          return res.status(500).json({
-            success: false,
-            message: 'Database error'
-          });
-        }
+      // Call service to get user profile
+      const userProfile = await authService.getUserProfile(userId);
 
-        if (!user) {
-          return res.status(404).json({
-            success: false,
-            message: 'User not found'
-          });
-        }
-
-        res.json({
-          success: true,
-          data: { user }
-        });
-      });
+      return sendSuccess(res, { user: userProfile });
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: 'Server error',
-        error: error.message
-      });
+      return handleServiceError(res, error);
     }
   }
 };

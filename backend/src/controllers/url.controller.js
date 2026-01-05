@@ -1,280 +1,128 @@
-const db = require('../database/db');
-const crypto = require('crypto');
+/**
+ * URL Controller
+ * Handles HTTP requests for URL shortening operations
+ * Delegates business logic to URL service
+ */
 
-const MAX_URLS_PER_USER = 100;
-const SHORT_CODE_LENGTH = 6;
-
-// Generate unique short code
-const generateShortCode = () => {
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let shortCode = '';
-  
-  for (let i = 0; i < SHORT_CODE_LENGTH; i++) {
-    const randomIndex = Math.floor(Math.random() * characters.length);
-    shortCode += characters[randomIndex];
-  }
-  
-  return shortCode;
-};
-
-// Check if short code exists
-const isShortCodeUnique = (shortCode) => {
-  return new Promise((resolve, reject) => {
-    db.get('SELECT id FROM urls WHERE short_code = ?', [shortCode], (err, row) => {
-      if (err) reject(err);
-      resolve(!row);
-    });
-  });
-};
-
-// Generate unique short code
-const generateUniqueShortCode = async () => {
-  let shortCode;
-  let isUnique = false;
-  let attempts = 0;
-  const maxAttempts = 10;
-
-  while (!isUnique && attempts < maxAttempts) {
-    shortCode = generateShortCode();
-    isUnique = await isShortCodeUnique(shortCode);
-    attempts++;
-  }
-
-  if (!isUnique) {
-    throw new Error('Failed to generate unique short code');
-  }
-
-  return shortCode;
-};
+const urlService = require('../services/url.service');
+const { sendSuccess, handleServiceError } = require('../utils/responseHelper');
+const { isValidUrl, sanitizeString } = require('../utils/validation');
 
 const urlController = {
-  // Create short URL
+  /**
+   * Create a new shortened URL
+   * POST /api/urls
+   * Body: { originalUrl }
+   * Requires authentication
+   */
   createUrl: async (req, res) => {
     try {
       const { originalUrl } = req.body;
       const userId = req.user.userId;
 
-      // Validate URL
+      // Validate required field
       if (!originalUrl) {
-        return res.status(400).json({
-          success: false,
-          message: 'Original URL is required'
-        });
+        return handleServiceError(
+          res,
+          { message: 'Original URL is required', statusCode: 400 }
+        );
       }
 
       // Validate URL format
-      try {
-        new URL(originalUrl);
-      } catch (e) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid URL format'
-        });
+      if (!isValidUrl(originalUrl)) {
+        return handleServiceError(
+          res,
+          { message: 'Please provide a valid URL (must include http:// or https://)', statusCode: 400 }
+        );
       }
 
-      // Check user's URL count
-      db.get(
-        'SELECT COUNT(*) as count FROM urls WHERE user_id = ?',
-        [userId],
-        async (err, result) => {
-          if (err) {
-            return res.status(500).json({
-              success: false,
-              message: 'Database error'
-            });
-          }
+      // Sanitize URL
+      const sanitizedUrl = sanitizeString(originalUrl);
 
-          if (result.count >= MAX_URLS_PER_USER) {
-            return res.status(403).json({
-              success: false,
-              message: `You have reached the maximum limit of ${MAX_URLS_PER_USER} URLs. Please upgrade your account.`,
-              limitReached: true
-            });
-          }
+      // Call service to create short URL
+      const shortUrlData = await urlService.createShortUrl(sanitizedUrl, userId);
 
-          try {
-            // Generate unique short code
-            const shortCode = await generateUniqueShortCode();
-
-            // Insert URL
-            const query = `
-              INSERT INTO urls (original_url, short_code, user_id, clicks, created_at) 
-              VALUES (?, ?, ?, 0, datetime('now'))
-            `;
-
-            db.run(query, [originalUrl, shortCode, userId], function(err) {
-              if (err) {
-                return res.status(500).json({
-                  success: false,
-                  message: 'Error creating short URL'
-                });
-              }
-
-              res.status(201).json({
-                success: true,
-                message: 'Short URL created successfully',
-                data: {
-                  id: this.lastID,
-                  originalUrl,
-                  shortCode,
-                  shortUrl: `${process.env.BASE_URL || 'http://localhost:3000'}/${shortCode}`,
-                  clicks: 0
-                }
-              });
-            });
-          } catch (error) {
-            res.status(500).json({
-              success: false,
-              message: error.message
-            });
-          }
-        }
+      return sendSuccess(
+        res,
+        shortUrlData,
+        'Short URL created successfully',
+        201
       );
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: 'Server error',
-        error: error.message
-      });
+      return handleServiceError(res, error);
     }
   },
 
-  // Get user's URLs
-  getUserUrls: (req, res) => {
+  /**
+   * Get all URLs for authenticated user
+   * GET /api/urls
+   * Requires authentication
+   */
+  getUserUrls: async (req, res) => {
     try {
       const userId = req.user.userId;
 
-      const query = `
-        SELECT id, original_url, short_code, clicks, created_at 
-        FROM urls 
-        WHERE user_id = ? 
-        ORDER BY created_at DESC
-      `;
+      // Call service to get user's URLs
+      const urlData = await urlService.getUserUrls(userId);
 
-      db.all(query, [userId], (err, rows) => {
-        if (err) {
-          return res.status(500).json({
-            success: false,
-            message: 'Database error'
-          });
-        }
-
-        const urls = rows.map(row => ({
-          id: row.id,
-          originalUrl: row.original_url,
-          shortCode: row.short_code,
-          shortUrl: `${process.env.BASE_URL || 'http://localhost:3000'}/${row.short_code}`,
-          clicks: row.clicks,
-          createdAt: row.created_at
-        }));
-
-        res.json({
-          success: true,
-          data: {
-            urls,
-            count: urls.length,
-            limit: MAX_URLS_PER_USER
-          }
-        });
-      });
+      return sendSuccess(res, urlData);
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: 'Server error',
-        error: error.message
-      });
+      return handleServiceError(res, error);
     }
   },
 
-  // Delete URL
-  deleteUrl: (req, res) => {
+  /**
+   * Delete a URL by ID
+   * DELETE /api/urls/:id
+   * Requires authentication
+   */
+  deleteUrl: async (req, res) => {
     try {
       const { id } = req.params;
       const userId = req.user.userId;
 
-      // Check if URL belongs to user
-      db.get(
-        'SELECT id FROM urls WHERE id = ? AND user_id = ?',
-        [id, userId],
-        (err, row) => {
-          if (err) {
-            return res.status(500).json({
-              success: false,
-              message: 'Database error'
-            });
-          }
+      // Validate ID parameter
+      const urlId = parseInt(id, 10);
+      if (isNaN(urlId)) {
+        return handleServiceError(
+          res,
+          { message: 'Invalid URL ID', statusCode: 400 }
+        );
+      }
 
-          if (!row) {
-            return res.status(404).json({
-              success: false,
-              message: 'URL not found or unauthorized'
-            });
-          }
+      // Call service to delete URL
+      await urlService.deleteUrl(urlId, userId);
 
-          // Delete URL
-          db.run('DELETE FROM urls WHERE id = ?', [id], (err) => {
-            if (err) {
-              return res.status(500).json({
-                success: false,
-                message: 'Error deleting URL'
-              });
-            }
-
-            res.json({
-              success: true,
-              message: 'URL deleted successfully'
-            });
-          });
-        }
-      );
+      return sendSuccess(res, null, 'URL deleted successfully');
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: 'Server error',
-        error: error.message
-      });
+      return handleServiceError(res, error);
     }
   },
 
-  // Get URL by short code and redirect
-  redirectUrl: (req, res) => {
+  /**
+   * Redirect to original URL by short code
+   * GET /:shortCode
+   * Public endpoint - no authentication required
+   */
+  redirectUrl: async (req, res) => {
     try {
       const { shortCode } = req.params;
 
-      db.get(
-        'SELECT original_url FROM urls WHERE short_code = ?',
-        [shortCode],
-        (err, row) => {
-          if (err) {
-            return res.status(500).json({
-              success: false,
-              message: 'Database error'
-            });
-          }
+      // Validate short code parameter
+      if (!shortCode || shortCode.trim() === '') {
+        return handleServiceError(
+          res,
+          { message: 'Short code is required', statusCode: 400 }
+        );
+      }
 
-          if (!row) {
-            return res.status(404).json({
-              success: false,
-              message: 'Short URL not found'
-            });
-          }
+      // Call service to get original URL and track click
+      const originalUrl = await urlService.getOriginalUrlByShortCode(shortCode);
 
-          // Increment click count
-          db.run(
-            'UPDATE urls SET clicks = clicks + 1 WHERE short_code = ?',
-            [shortCode]
-          );
-
-          // Redirect to original URL
-          res.redirect(row.original_url);
-        }
-      );
+      // Redirect to original URL
+      return res.redirect(originalUrl);
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: 'Server error',
-        error: error.message
-      });
+      return handleServiceError(res, error);
     }
   }
 };
