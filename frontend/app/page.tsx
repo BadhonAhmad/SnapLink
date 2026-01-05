@@ -1,6 +1,9 @@
+import Link from "next/link";
+import Button from "@/components/Button";
+
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24">
+    <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gradient-to-b from-gray-50 to-gray-100">
       <div className="z-10 max-w-5xl w-full items-center justify-center font-mono text-sm">
         <h1 className="text-6xl font-bold text-center mb-4 text-gray-800">
           SnapLink
@@ -9,20 +12,14 @@ export default function Home() {
           Your URL Shortening Solution
         </p>
         <div className="flex gap-4 justify-center">
-          <a
-            href="/login"
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-          >
-            Login
-          </a>
-          <a
-            href="/register"
-            className="px-6 py-3 bg-white text-blue-600 border-2 border-blue-600 rounded-lg hover:bg-blue-50 transition"
-          >
-            Register
-          </a>
+          <Link href="/login">
+            <Button variant="primary">Login</Button>
+          </Link>
+          <Link href="/register">
+            <Button variant="secondary">Register</Button>
+          </Link>
         </div>
       </div>
     </main>
-  )
+  );
 }

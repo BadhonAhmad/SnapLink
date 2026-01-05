@@ -3,6 +3,10 @@
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { authService } from "@/services/authService";
+import AuthLayout from "@/components/AuthLayout";
+import Input from "@/components/Input";
+import Button from "@/components/Button";
+import Alert from "@/components/Alert";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,75 +36,40 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-xl shadow-lg">
-        <h1 className="text-3xl font-bold text-center text-gray-800">Login</h1>
-        <p className="text-center text-gray-600">
-          Sign in to your SnapLink account
-        </p>
+    <AuthLayout
+      title="Login"
+      subtitle="Sign in to your SnapLink account"
+      footer={{
+        text: "Don't have an account?",
+        linkText: "Register",
+        linkHref: "/register",
+      }}
+    >
+      {error && <Alert variant="error">{error}</Alert>}
 
-        {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-            <p className="text-sm text-red-600">{error}</p>
-          </div>
-        )}
+      <form className="space-y-4" onSubmit={handleSubmit}>
+        <Input
+          type="email"
+          label="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          placeholder="you@example.com"
+        />
 
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          <div>
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Email
-            </label>
-            <input
-              type="email"
-              id="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
-              placeholder="you@example.com"
-            />
-          </div>
+        <Input
+          type="password"
+          label="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          placeholder="••••••••"
+        />
 
-          <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Password
-            </label>
-            <input
-              type="password"
-              id="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
-              placeholder="••••••••"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isLoading ? "Signing In..." : "Sign In"}
-          </button>
-        </form>
-
-        <p className="text-center text-sm text-gray-600">
-          Donot have an account?{" "}
-          <a
-            href="/register"
-            className="text-blue-600 hover:text-blue-700 font-medium"
-          >
-            Register
-          </a>
-        </p>
-      </div>
-    </div>
+        <Button type="submit" isLoading={isLoading} fullWidth>
+          {isLoading ? "Signing In..." : "Sign In"}
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }

@@ -5,6 +5,11 @@ import { authService } from "@/services/authService";
 import { urlService, Url } from "@/services/urlService";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback, FormEvent } from "react";
+import Card from "@/components/Card";
+import Button from "@/components/Button";
+import Input from "@/components/Input";
+import Alert from "@/components/Alert";
+import StatsCard from "@/components/StatsCard";
 
 export default function DashboardPage() {
   const { isLoading } = useAuth();
@@ -135,7 +140,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen p-8">
+    <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-7xl mx-auto">
         <header className="mb-8 flex justify-between items-center">
           <div>
@@ -144,86 +149,55 @@ export default function DashboardPage() {
               Welcome back, {user?.name || user?.email || "User"}!
             </p>
           </div>
-          <button
-            onClick={handleLogout}
-            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-          >
+          <Button onClick={handleLogout} variant="danger">
             Logout
-          </button>
+          </Button>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">
-              Total Links
-            </h3>
-            <p className="text-3xl font-bold text-blue-600">{urlCount}</p>
-            <p className="text-sm text-gray-500 mt-1">
-              {urlCount}/{urlLimit} limit
-            </p>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">
-              Total Clicks
-            </h3>
-            <p className="text-3xl font-bold text-green-600">{totalClicks}</p>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">
-              Active Links
-            </h3>
-            <p className="text-3xl font-bold text-purple-600">{urlCount}</p>
-          </div>
+          <StatsCard
+            title="Total Links"
+            value={urlCount}
+            subtitle={`${urlCount}/${urlLimit} limit`}
+            color="blue"
+          />
+          <StatsCard title="Total Clicks" value={totalClicks} color="green" />
+          <StatsCard title="Active Links" value={urlCount} color="purple" />
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <Card className="mb-8">
           <h2 className="text-2xl font-bold text-gray-800 mb-4">
             Create Short Link
           </h2>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-              <p className="text-sm text-red-600">{error}</p>
+            <div className="mb-4">
+              <Alert variant="error">{error}</Alert>
             </div>
           )}
 
           {success && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
-              <p className="text-sm text-green-600">{success}</p>
+            <div className="mb-4">
+              <Alert variant="success">{success}</Alert>
             </div>
           )}
 
           <form className="space-y-4" onSubmit={handleCreateUrl}>
-            <div>
-              <label
-                htmlFor="url"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Enter your long URL
-              </label>
-              <input
-                type="url"
-                id="url"
-                value={longUrl}
-                onChange={(e) => setLongUrl(e.target.value)}
-                required
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
-                placeholder="https://example.com/very/long/url"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={isCreating}
-              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+            <Input
+              type="url"
+              label="Enter your long URL"
+              value={longUrl}
+              onChange={(e) => setLongUrl(e.target.value)}
+              required
+              placeholder="https://example.com/very/long/url"
+            />
+            <Button type="submit" isLoading={isCreating}>
               {isCreating ? "Creating..." : "Shorten URL"}
-            </button>
+            </Button>
           </form>
-        </div>
+        </Card>
 
-        <div className="bg-white rounded-lg shadow-md p-6 mt-8">
+        <Card>
           <h2 className="text-2xl font-bold text-gray-800 mb-4">Your Links</h2>
 
           {urls.length === 0 ? (
@@ -314,7 +288,7 @@ export default function DashboardPage() {
               </table>
             </div>
           )}
-        </div>
+        </Card>
       </div>
     </div>
   );
