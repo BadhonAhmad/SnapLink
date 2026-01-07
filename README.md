@@ -2,6 +2,10 @@
 
 A modern, full-stack URL shortening web application with user authentication, analytics, and usage tracking. Built with Node.js, Express, Next.js, and SQLite.
 
+## 🎥 Demo Video
+
+Watch the project demo: [SnapLink Demo on YouTube](https://youtu.be/mdbHcTmcLIY)
+
 ## 📋 Table of Contents
 - [Setup Instructions](#setup-instructions)
 - [Project Structure](#project-structure)
