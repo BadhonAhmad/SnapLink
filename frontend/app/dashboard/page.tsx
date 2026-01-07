@@ -10,6 +10,8 @@ import Button from "@/components/Button";
 import Input from "@/components/Input";
 import Alert from "@/components/Alert";
 import StatsCard from "@/components/StatsCard";
+import ProfileDropdown from "@/components/ProfileDropdown";
+import DateFilter from "@/components/DateFilter";
 
 export default function DashboardPage() {
   const { isLoading } = useAuth();
@@ -18,6 +20,10 @@ export default function DashboardPage() {
 
   const [longUrl, setLongUrl] = useState("");
   const [urls, setUrls] = useState<Url[]>([]);
+  const [filteredUrls, setFilteredUrls] = useState<Url[]>([]);
+  const [dateFilter, setDateFilter] = useState("all");
+  const [customFromDate, setCustomFromDate] = useState<string>("");
+  const [customToDate, setCustomToDate] = useState<string>("");
   const [urlCount, setUrlCount] = useState(0);
   const [urlLimit, setUrlLimit] = useState(100);
   const [totalClicks, setTotalClicks] = useState(0);
@@ -131,6 +137,80 @@ export default function DashboardPage() {
     });
   };
 
+  // Filter URLs based on date
+  const filterUrlsByDate = useCallback(
+    (urlsList: Url[], filter: string, fromDate?: string, toDate?: string) => {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+      switch (filter) {
+        case "today":
+          return urlsList.filter((url) => {
+            const urlDate = new Date(url.createdAt);
+            return urlDate >= today;
+          });
+
+        case "week":
+          const weekAgo = new Date(today);
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          return urlsList.filter((url) => {
+            const urlDate = new Date(url.createdAt);
+            return urlDate >= weekAgo;
+          });
+
+        case "month":
+          const monthAgo = new Date(today);
+          monthAgo.setMonth(monthAgo.getMonth() - 1);
+          return urlsList.filter((url) => {
+            const urlDate = new Date(url.createdAt);
+            return urlDate >= monthAgo;
+          });
+
+        case "custom":
+          if (fromDate && toDate) {
+            const from = new Date(fromDate);
+            from.setHours(0, 0, 0, 0);
+            const to = new Date(toDate);
+            to.setHours(23, 59, 59, 999);
+
+            return urlsList.filter((url) => {
+              const urlDate = new Date(url.createdAt);
+              return urlDate >= from && urlDate <= to;
+            });
+          }
+          return urlsList;
+
+        case "all":
+        default:
+          return urlsList;
+      }
+    },
+    []
+  );
+
+  // Update filtered URLs when urls or dateFilter changes
+  useEffect(() => {
+    setFilteredUrls(
+      filterUrlsByDate(urls, dateFilter, customFromDate, customToDate)
+    );
+  }, [urls, dateFilter, customFromDate, customToDate, filterUrlsByDate]);
+
+  // Handle date filter change
+  const handleDateFilterChange = (
+    filter: string,
+    fromDate?: string,
+    toDate?: string
+  ) => {
+    setDateFilter(filter);
+    if (filter === "custom" && fromDate && toDate) {
+      setCustomFromDate(fromDate);
+      setCustomToDate(toDate);
+    } else {
+      setCustomFromDate("");
+      setCustomToDate("");
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -149,9 +229,7 @@ export default function DashboardPage() {
               Welcome back, {user?.name || user?.email || "User"}!
             </p>
           </div>
-          <Button onClick={handleLogout} variant="danger">
-            Logout
-          </Button>
+          <ProfileDropdown user={user} onLogout={handleLogout} />
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -198,11 +276,19 @@ export default function DashboardPage() {
         </Card>
 
         <Card>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Your Links</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-bold text-gray-800">Your Links</h2>
+            <DateFilter
+              selectedFilter={dateFilter}
+              onFilterChange={handleDateFilterChange}
+            />
+          </div>
 
-          {urls.length === 0 ? (
+          {filteredUrls.length === 0 ? (
             <p className="text-gray-600">
-              No links created yet. Create your first short link above!
+              {urls.length === 0
+                ? "No links created yet. Create your first short link above!"
+                : "No links found for the selected date range."}
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -230,7 +316,7 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {urls.map((url) => (
+                  {filteredUrls.map((url) => (
                     <tr key={url.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 max-w-xs">
