@@ -4,7 +4,9 @@ A modern, full-stack URL shortening web application with user authentication, an
 
 ## 🎥 Demo Video
 
-Watch the project demo: [SnapLink Demo on YouTube](https://youtu.be/mdbHcTmcLIY)
+[![SnapLink Demo](https://img.youtube.com/vi/mdbHcTmcLIY/maxresdefault.jpg)](https://youtu.be/mdbHcTmcLIY)
+
+*Click the image above to watch the project demo on YouTube*
 
 ## 📋 Table of Contents
 - [Setup Instructions](#setup-instructions)
